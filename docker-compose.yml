@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: cardioguard-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cardioguard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cardioguard_secure_pwd_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-cardioguard_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cardioguard} -d ${POSTGRES_DB:-cardioguard_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cardioguard-backend
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-cardioguard}:${POSTGRES_PASSWORD:-cardioguard_secure_pwd_2026}@db:5432/${POSTGRES_DB:-cardioguard_db}
+      - SECRET_KEY=${SECRET_KEY:-cardioguard-super-secret-production-jwt-key-2026-secure-random-seed}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend/saved_models:/app/saved_models
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cardioguard-frontend
+    restart: always
+    ports:
+      - "80:80"
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+
